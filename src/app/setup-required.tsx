@@ -22,7 +22,7 @@ export function SetupRequired({
     diagnostic?.sources.some((source) => source.present) || diagnostic?.file.present;
 
   return (
-    <main className="center-screen" style={{ padding: 24 }}>
+    <section id="configuration" style={{ padding: "0 24px 80px", display: "flex", justifyContent: "center" }}>
       <div className="panel" style={{ width: "min(820px, 100%)", padding: 40 }}>
         <span className="eyebrow">CoSign Bank</span>
         <h1 style={{ margin: "10px 0 14px", fontSize: 30, letterSpacing: "-.03em" }}>
@@ -159,7 +159,7 @@ export function SetupRequired({
           and the realm&apos;s public signing keys.
         </p>
       </div>
-    </main>
+    </section>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTideCloak } from "@tidecloak/nextjs";
+import { useTideCloak } from "@/lib/tide/bridge";
 
 const DISMISS_KEY = "tide.profile-onboarding.dismissed";
 

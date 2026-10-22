@@ -1,6 +1,6 @@
 "use client";
 
-import { useTideCloak } from "@tidecloak/nextjs";
+import { useTideCloak } from "@/lib/tide/bridge";
 
 export default function HomePage() {
   const { authenticated, getValueFromIdToken, login, logout, isInitializing } = useTideCloak();

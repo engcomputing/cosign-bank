@@ -102,6 +102,56 @@ Before recording, each founder opens **Co-owners → Enroll my face**, completes
 npm run reset:faces
 ```
 
+## Authentication modes
+
+The app has one `useTideCloak()` surface (`src/lib/tide/bridge.tsx`) with two backends, chosen
+at request time by `authMode()`:
+
+| Mode | When | Sign-in | Server access checks | DPoP |
+| :--- | :--- | :--- | :--- | :--- |
+| `tidecloak` | an adapter resolves (`CLIENT_ADAPTER*` or `data/tidecloak.json`) | real Tide OIDC | `verifyTideJWT` + `withRole` | verified |
+| `simulated` | no adapter, `DEMO_AUTH` not `0` (default) | persona picker, signed demo token | `verifyDemoToken` + `withRole` | not applicable |
+| `unconfigured` | no adapter, `DEMO_AUTH=0` | disabled | 503 with a configuration hint | — |
+
+Route handlers never branch on the mode: they receive a verified `JWTPayload` and run the same
+`withRole("account:joint-owner")` checks either way. Swapping the simulator for TideCloak is
+configuration, not application code.
+
+### Where TideCloak fits, and what the simulator stands in for
+
+| Capability | Real TideCloak mechanism | Status now |
+| :--- | :--- | :--- |
+| Browser sign-in | OIDC authorization code + PKCE against the realm | **simulated** (persona picker issues a token) |
+| Token integrity | Realm-signed JWT; server verifies signature, issuer, `azp`, expiry | **simulated** (HMAC, same claim shape, same checks) |
+| Sender-constrained tokens | `cnf.jkt` + RFC 9449 DPoP proof verified per request | **simulated: absent** (nothing to bind) |
+| Roles / authorisation | `realm_access.roles` incl. `account:joint-owner` | **enforced for real** in `withRole` |
+| Governed role changes | QEA 2-of-3 threshold on admin grants | **not simulated** (documented UI copy only) |
+| Withdrawal signing | Forseti contract + ORK threshold signature | **not deployed** (unchanged) |
+
+Because sign-in, token verification and role enforcement are simulated, **the simulator is not a
+security boundary**. Its HMAC secret is a constant in the source. It exists so the product can be
+built and reviewed; every screen it touches is covered by the SIMULATED IDENTITY banner, and
+`/api/config` reports `authMode: "simulated"`.
+
+Switching to the real thing:
+
+```bash
+# 1. Stand TideCloak up and export its adapter
+npm run init                     # Docker + Tide licence + your acceptance of the terms
+# 2. Deploy the adapter (see the deployment section below)
+npm run verify:auth && npm run deploy
+```
+
+The moment an adapter resolves, `/api/demo-auth` returns 404, simulated tokens are rejected, and
+`authMode` becomes `tidecloak`.
+
+### Simulated data storage
+
+`data/bank-demo-db.json` and `data/face-profiles.json` persist on a writable filesystem. On a
+read-only host (Vercel), the app seeds itself from `data/*.seed.json` and keeps changes in memory
+for the life of the instance; `/api/account` reports `syntheticStore: "file" | "memory"` so the UI
+never implies durability it does not have.
+
 ## Deploying to Vercel (or any hosted Node host)
 
 `data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app resolves the adapter on the server at request time and passes it to the client provider as a prop, so a clean checkout builds and a missing config produces an explanation page rather than a crash.
@@ -210,6 +260,14 @@ guessing. The table below is the short version.
 | A variable listed `empty (0 chars)` | The variable exists with no value. |
 | All sources valid, yet login fails | `auth-server-url` is loopback or `http://` — see the next section. |
 
+### Preview mode (no adapter configured)
+
+When no adapter resolves, the app renders the real landing page with a **Preview mode** banner
+instead of an error: sign-in and the approval dashboard are visibly disabled, and the
+configuration panel below the fold shows the deployment diagnostic. Nothing is simulated —
+there is no fake session, no seeded login state, and the disabled controls have no handler.
+Configure an adapter and the same URL serves the normal, fully interactive app.
+
 ### Two Vercel projects, one repo
 
 The diagnosing field is **Vercel project ID** in the table above. Vercel keys environment
@@ -217,12 +275,25 @@ variables to a *project*, not to a repository, so if two projects build this rep
 result of importing it once from the dashboard and once with `vercel`), a variable added to
 one is invisible to the other — and the URL you are looking at may be served by the wrong one.
 
+One command finds the project serving a URL, configures it, deploys, and verifies:
+
+```bash
+npm run fix:vercel -- --url=https://your-app.vercel.app
+```
+
+It reads the deployment's own `/api/config` for its project ID, maps that ID to a project name
+in your account, links it, uploads the adapter to every environment, deploys, then re-reads
+`/api/config` and **fails if the deployed project ID is not the one it configured** — which is
+how a duplicate project gets caught instead of silently ignored.
+
+Read-only inspection instead of acting:
+
 ```bash
 npm run diagnose -- --url=https://your-app.vercel.app   # reads /api/config, then inspects projects
 npm run diagnose -- --url=... --search                 # also finds projects that DO have the variable
 ```
 
-Then deploy to the project that actually serves the URL:
+Or target a project you already know:
 
 ```bash
 npm run deploy -- --project=<project-name> --scope=<team-slug>

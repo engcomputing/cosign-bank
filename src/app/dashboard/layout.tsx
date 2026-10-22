@@ -1,6 +1,6 @@
 "use client";
 
-import { useTideCloak } from "@tidecloak/nextjs";
+import { useTideCloak } from "@/lib/tide/bridge";
 import { useEffect } from "react";
 
 // Playbook: protect-routes-nextjs
