@@ -1,0 +1,22 @@
+{
+  "dataset": {
+    "name": "Synthetic Gen Z Investment Behaviour Survey",
+    "notice": "All records are fictional and contain no real participant data.",
+    "records": [
+      { "id": "GZ-001", "ageRange": "18–20", "experience": "Beginner", "preferredAsset": "ETFs", "riskTolerance": "Medium", "monthlyInvestmentAud": 120 },
+      { "id": "GZ-002", "ageRange": "21–23", "experience": "Intermediate", "preferredAsset": "Crypto", "riskTolerance": "High", "monthlyInvestmentAud": 300 },
+      { "id": "GZ-003", "ageRange": "18–20", "experience": "Beginner", "preferredAsset": "Savings", "riskTolerance": "Low", "monthlyInvestmentAud": 80 },
+      { "id": "GZ-004", "ageRange": "24–26", "experience": "Intermediate", "preferredAsset": "ETFs", "riskTolerance": "Medium", "monthlyInvestmentAud": 450 },
+      { "id": "GZ-005", "ageRange": "21–23", "experience": "Beginner", "preferredAsset": "Stocks", "riskTolerance": "Medium", "monthlyInvestmentAud": 200 },
+      { "id": "GZ-006", "ageRange": "24–26", "experience": "Advanced", "preferredAsset": "Stocks", "riskTolerance": "High", "monthlyInvestmentAud": 700 },
+      { "id": "GZ-007", "ageRange": "21–23", "experience": "Intermediate", "preferredAsset": "ETFs", "riskTolerance": "Low", "monthlyInvestmentAud": 250 },
+      { "id": "GZ-008", "ageRange": "18–20", "experience": "Beginner", "preferredAsset": "ETFs", "riskTolerance": "Medium", "monthlyInvestmentAud": 100 }
+    ],
+    "summary": {
+      "participants": 8,
+      "medianMonthlyInvestmentAud": 225,
+      "topAsset": "ETFs"
+    }
+  },
+  "accessRequests": []
+}

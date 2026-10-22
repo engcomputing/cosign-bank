@@ -1,0 +1,12 @@
+{
+  "name": "CoSign Joint Withdrawal",
+  "modelId": "BasicCustom<JointWithdrawal>:BasicCustom<1>",
+  "resource": "cosign-bank-client",
+  "ownerRole": "account:joint-owner",
+  "minApprovers": 2,
+  "approvalWindowSeconds": 180,
+  "maxAmountVnd": 100000000,
+  "approvalType": "EXPLICIT",
+  "executionType": "PRIVATE",
+  "deploymentStatus": "requires-tide-team"
+}

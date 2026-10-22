@@ -1,0 +1,60 @@
+{
+  "account": {
+    "id": "JOINT-2026-001",
+    "name": "Future Fund · Joint Account",
+    "accountNumberMasked": "•••• 2048",
+    "currency": "VND",
+    "balanceVnd": 240000000,
+    "availableVnd": 240000000,
+    "owners": [
+      {
+        "id": "owner-admin-a",
+        "name": "Admin A",
+        "initials": "AA",
+        "sharePercent": 34,
+        "device": "Tide-linked demo identity"
+      },
+      {
+        "id": "owner-founder-b",
+        "name": "Founder B",
+        "initials": "FB",
+        "sharePercent": 33,
+        "device": "Tide-linked demo identity"
+      },
+      {
+        "id": "owner-founder-c",
+        "name": "Founder C",
+        "initials": "FC",
+        "sharePercent": 33,
+        "device": "Tide-linked demo identity"
+      }
+    ]
+  },
+  "recentActivity": [
+    {
+      "id": "TX-1003",
+      "label": "Monthly contribution",
+      "counterparty": "Minh Nguyen",
+      "amountVnd": 12000000,
+      "direction": "in",
+      "createdAt": "2026-10-20T02:10:00.000Z"
+    },
+    {
+      "id": "TX-1002",
+      "label": "Term deposit allocation",
+      "counterparty": "CoSign Savings",
+      "amountVnd": 30000000,
+      "direction": "out",
+      "createdAt": "2026-10-14T08:30:00.000Z"
+    },
+    {
+      "id": "TX-1001",
+      "label": "Monthly contribution",
+      "counterparty": "Linh Tran",
+      "amountVnd": 12000000,
+      "direction": "in",
+      "createdAt": "2026-10-10T03:05:00.000Z"
+    }
+  ],
+  "withdrawalRequests": []
+}
