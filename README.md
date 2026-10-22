@@ -354,4 +354,14 @@ docker stop tidecloak
 docker start tidecloak
 ```
 
+## Demo Video
+
+
+
+https://github.com/user-attachments/assets/bfcdfeda-aca2-4200-868a-9e8847575149
+
+
+
+
+
 Use [SUBMISSION_CHECKLIST.md](./SUBMISSION_CHECKLIST.md) before publishing the repository or recording the final MP4.
