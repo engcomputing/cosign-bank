@@ -8,6 +8,7 @@
     "start": "next start",
     "init": "bash scripts/init-tidecloak.sh",
     "seed": "node scripts/reset-demo-data.mjs",
+    "deploy:check": "node scripts/check-deploy-config.mjs",
     "reset": "node scripts/reset-demo-data.mjs",
     "reset:faces": "node scripts/reset-face-profiles.mjs",
     "test:unauth": "node scripts/check-unauthenticated.mjs",
