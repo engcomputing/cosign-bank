@@ -23,3 +23,5 @@ data/bank-demo-db.json
 data/bank-demo-db.json.tmp
 data/face-profiles.json
 data/face-profiles.json.tmp
+
+.vercel
