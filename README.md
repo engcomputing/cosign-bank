@@ -104,17 +104,57 @@ npm run reset:faces
 
 ## Deploying to Vercel (or any hosted Node host)
 
-`data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app therefore resolves the adapter on the server from the `CLIENT_ADAPTER` environment variable and passes it to the client provider as a prop. The build no longer imports the JSON file, so a clean checkout compiles.
+`data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app resolves the adapter on the server at request time and passes it to the client provider as a prop, so a clean checkout builds and a missing config produces an explanation page rather than a crash.
 
-1. Locally run `npm run init` and copy the generated `data/tidecloak.json`.
-2. Collapse it to one line:
-   ```bash
-   jq -c . data/tidecloak.json
-   ```
-3. In Vercel, open **Project → Settings → Environment Variables** and add `CLIENT_ADAPTER` with that single-line JSON for Production, Preview and Development, then redeploy.
-4. Never commit `data/tidecloak.json`.
+### The two-step deploy
 
-If `CLIENT_ADAPTER` is missing or malformed the build still succeeds; the app renders a setup page explaining what to set, and `/api/config` returns the same message with HTTP 500. Local development is unchanged: with no `CLIENT_ADAPTER`, the adapter is read from `data/tidecloak.json`.
+```bash
+npm run init        # once, on the machine that hosts TideCloak → data/tidecloak.json
+npm run deploy:check
+```
+
+`deploy:check` validates the adapter and prints the exact `vercel env add` commands, already filled in:
+
+```bash
+npm run deploy:check
+# ✓ Adapter found in data/tidecloak.json
+# ✓ Required fields present (realm, auth-server-url, resource, jwk)
+# ... then either run the printed commands, or paste the value by hand
+```
+
+Manual equivalent: Vercel → **Settings → Environment Variables** → add `CLIENT_ADAPTER` (single-line JSON from `jq -c . data/tidecloak.json`) for **Production and Preview**, then **redeploy** — environment variable changes never apply to existing deployments.
+
+Supported variables, in priority order:
+
+| Variable | Use |
+| :--- | :--- |
+| `CLIENT_ADAPTER` | the adapter as single-line JSON |
+| `TIDECLOAK_ADAPTER` | alias, same format |
+| `CLIENT_ADAPTER_B64` | base64 of the adapter — use when a dashboard mangles multi-line JSON (`base64 -w0 data/tidecloak.json`) |
+
+A base64 value pasted into `CLIENT_ADAPTER` also works. Never commit `data/tidecloak.json`.
+
+### Sign-in needs a publicly reachable TideCloak
+
+The adapter written by `npm run init` points at `http://localhost:8080`. That URL only resolves on the machine running the container, so a hosted deployment cannot complete sign-in no matter which variable holds the adapter. The app detects this: when served from a real hostname it shows a banner explaining the problem instead of hanging on login, and `npm run deploy:check` exits non-zero for the same reason.
+
+To host it properly, expose TideCloak on a public HTTPS URL and re-export the adapter:
+
+```bash
+TIDECLOAK_URL=https://tidecloak.example.com CLIENT_APP_URL=https://your-app.vercel.app ./scripts/init-tidecloak.sh
+```
+
+If TideCloak is not publicly reachable, run the demo locally — that is the intended deployment mode for this prototype.
+
+### Diagnostics
+
+| Symptom | Meaning |
+| :--- | :--- |
+| "No TideCloak adapter config found…" page | No adapter variable is set for this environment, or it was added after the deploy. Add it and redeploy. |
+| "…is set but empty" | The variable exists with no value. |
+| "…is not valid JSON" | Paste mangled the value; use `CLIENT_ADAPTER_B64`. |
+| Yellow banner above the app | Adapter loaded, but `auth-server-url` is loopback or plain `http://` and the app is served from a real host. |
+| `/api/config` | Returns the adapter, or the same error text with HTTP 500, plus `warnings` when sign-in cannot work. |
 
 The adapter is public configuration (public client settings plus the realm's public signing keys), not a credential. `KC_BOOTSTRAP_ADMIN_*`, `TIDE_LICENSE_EMAIL` and `TIDE_TERMS_ACCEPTED` are only used by `npm run init` on your own machine and do not belong in a hosted environment.
 
