@@ -14,7 +14,17 @@ const dataDirectory = path.join(process.cwd(), "data");
 const profilePath = path.join(dataDirectory, "face-profiles.json");
 let profileUpdateQueue: Promise<unknown> = Promise.resolve();
 
+// Same two-layer storage as the bank database: a file when the filesystem is
+// writable, an in-memory array when it is not (hosted/read-only). In-memory
+// templates vanish with the instance, which the UI states rather than hides.
+let memoryProfiles: FaceProfile[] | null = null;
+
+function cloneProfiles(profiles: FaceProfile[]): FaceProfile[] {
+  return structuredClone(profiles);
+}
+
 export async function readFaceProfiles(): Promise<FaceProfile[]> {
+  if (memoryProfiles) return cloneProfiles(memoryProfiles);
   try {
     const raw = await readFile(profilePath, "utf8");
     const value = JSON.parse(raw) as unknown;
@@ -61,10 +71,19 @@ export async function enrollFaceProfile(
     const existingIndex = profiles.findIndex((entry) => entry.subject === subject);
     if (existingIndex >= 0) profiles[existingIndex] = profile;
     else profiles.push(profile);
-    await mkdir(dataDirectory, { recursive: true });
-    const temporaryPath = `${profilePath}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(profiles, null, 2)}\n`, "utf8");
-    await rename(temporaryPath, profilePath);
+    try {
+      await mkdir(dataDirectory, { recursive: true });
+      const temporaryPath = `${profilePath}.tmp`;
+      await writeFile(temporaryPath, `${JSON.stringify(profiles, null, 2)}\n`, "utf8");
+      await rename(temporaryPath, profilePath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EROFS" || code === "EACCES" || code === "EPERM" || code === "ENOENT") {
+        memoryProfiles = cloneProfiles(profiles);
+        return profile;
+      }
+      throw error;
+    }
     return profile;
   });
   profileUpdateQueue = update.then(

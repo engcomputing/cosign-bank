@@ -1,11 +1,13 @@
 import { withRole } from "@/lib/auth/protect";
+import { authMode } from "@/lib/auth/authMode";
 import { displayNameFromToken } from "@/lib/auth/identity";
-import { readBankDatabase } from "@/lib/demo-db";
+import { bankStorageMode, readBankDatabase } from "@/lib/demo-db";
 import { getFaceProfileStatus } from "@/lib/face-profile-store";
 
 export const dynamic = "force-dynamic";
 
 export const GET = withRole("account:joint-owner", async (_request, jwt) => {
+  const mode = authMode();
   if (!jwt.sub) {
     return Response.json({ error: "Verified Tide token has no subject" }, { status: 400 });
   }
@@ -35,8 +37,10 @@ export const GET = withRole("account:joint-owner", async (_request, jwt) => {
       },
       faceProfile,
       security: {
-        tideLogin: "verified-server-side",
-        dpop: "strict",
+        authMode: mode,
+        syntheticStore: bankStorageMode(),
+        tideLogin: mode === "tidecloak" ? "verified-server-side" : "simulated-not-tidecloak",
+        dpop: mode === "tidecloak" ? "strict" : "not-applicable-simulated",
         applicationApproval: "server-enforced-demo",
         signingPolicy: "requires-tide-team-deployment",
         biometricLiveness: "client-camera-challenge",

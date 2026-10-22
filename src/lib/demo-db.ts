@@ -74,21 +74,85 @@ export type WithdrawalInput = {
 
 const dataDirectory = path.join(process.cwd(), "data");
 const databasePath = path.join(dataDirectory, "bank-demo-db.json");
+const seedPath = path.join(dataDirectory, "bank-demo-db.seed.json");
 let databaseUpdateQueue: Promise<unknown> = Promise.resolve();
 
-export async function readBankDatabase(): Promise<BankDatabase> {
-  const raw = await readFile(databasePath, "utf8");
+// Hosted filesystems (Vercel, most container platforms) are read-only and
+// per-instance. The synthetic store therefore has two layers:
+//
+//   file    — data/bank-demo-db.json (gitignored), used locally, survives restarts
+//   memory  — seeded from data/bank-demo-db.seed.json, used when the file cannot be
+//             created or written; survives for the life of the instance only
+//
+// The API surfaces which layer is live, so a demo never claims to have persisted
+// something it kept in RAM.
+type StorageMode = "file" | "memory";
+let storageMode: StorageMode = "file";
+let memoryDatabase: BankDatabase | null = null;
+
+export function bankStorageMode(): StorageMode {
+  return storageMode;
+}
+
+function cloneDatabase(database: BankDatabase): BankDatabase {
+  return structuredClone(database);
+}
+
+async function readSeedDatabase(): Promise<BankDatabase> {
+  const raw = await readFile(seedPath, "utf8");
   return JSON.parse(raw) as BankDatabase;
+}
+
+export async function readBankDatabase(): Promise<BankDatabase> {
+  if (storageMode === "memory" && memoryDatabase) {
+    return cloneDatabase(memoryDatabase);
+  }
+
+  try {
+    const raw = await readFile(databasePath, "utf8");
+    return JSON.parse(raw) as BankDatabase;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+
+    // No writable-copy yet: try to create it so local runs behave as before.
+    const seed = await readSeedDatabase();
+    try {
+      await mkdir(dataDirectory, { recursive: true });
+      await writeFile(databasePath, `${JSON.stringify(seed, null, 2)}\n`, "utf8");
+    } catch {
+      storageMode = "memory";
+      memoryDatabase = seed;
+    }
+    return cloneDatabase(seed);
+  }
 }
 
 async function updateBankDatabase<T>(mutator: (database: BankDatabase) => T | Promise<T>): Promise<T> {
   const update = databaseUpdateQueue.then(async () => {
     const database = await readBankDatabase();
     const result = await mutator(database);
-    await mkdir(dataDirectory, { recursive: true });
-    const temporaryPath = `${databasePath}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(database, null, 2)}\n`, "utf8");
-    await rename(temporaryPath, databasePath);
+
+    if (storageMode === "memory") {
+      memoryDatabase = cloneDatabase(database);
+      return result;
+    }
+
+    try {
+      await mkdir(dataDirectory, { recursive: true });
+      const temporaryPath = `${databasePath}.tmp`;
+      await writeFile(temporaryPath, `${JSON.stringify(database, null, 2)}\n`, "utf8");
+      await rename(temporaryPath, databasePath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EROFS" || code === "EACCES" || code === "EPERM" || code === "ENOENT") {
+        // Read-only filesystem: keep the change in memory for this instance and
+        // stop pretending writes persist.
+        storageMode = "memory";
+        memoryDatabase = cloneDatabase(database);
+        return result;
+      }
+      throw error;
+    }
     return result;
   });
 

@@ -3,15 +3,23 @@
 import { TideCloakProvider } from "@tidecloak/nextjs";
 import type { TidecloakConfig } from "@/lib/auth/tidecloakConfig";
 import { ProfileOnboarding } from "@/components/ProfileOnboarding";
+import { DemoBridge, RealBridge } from "@/lib/tide/bridge";
 
-// Playbook: add-auth-nextjs-fresh Step 4a
-// useDPoP goes inside config object (not as a separate JSX prop).
-// Enables client-side DPoP proof generation (required for secureFetch).
+// Auth providers. The app talks to `useTideCloak()` from "@/lib/tide/bridge", which
+// is backed by one of two implementations:
 //
-// The adapter JSON is resolved on the server (env var or data/tidecloak.json)
-// and passed in as a prop. Do NOT statically import data/tidecloak.json here:
-// that file is gitignored, so a clean checkout — Vercel, CI, a new machine —
-// has no such module and `next build` fails to resolve it.
+//   config present → real TideCloak (OIDC logins, DPoP-bound tokens, realm roles)
+//   config absent  → simulated identity (DEMO_AUTH, default on) so the app can be
+//                    built and reviewed exactly as if Tide protected it
+//
+// Playbook: add-auth-nextjs-fresh Step 4a — useDPoP goes inside the config object,
+// not as a separate JSX prop; it enables client-side DPoP proof generation, which
+// the server verifies in src/lib/auth/protect.ts.
+//
+// The adapter JSON is resolved on the server (env var or data/tidecloak.json) and
+// passed in as a prop. Do NOT statically import data/tidecloak.json here: that file
+// is gitignored, so a clean checkout — Vercel, CI, a new machine — has no such
+// module and `next build` fails to resolve it.
 export function Providers({
   config,
   children,
@@ -23,11 +31,22 @@ export function Providers({
     <TideCloakProvider
       config={{ ...config, useDPoP: { mode: "strict", alg: "ES256" } }}
     >
-      {children}
-      <ProfileOnboarding
-        baseUrl={config["auth-server-url"].replace(/\/+$/, "")}
-        realm={config.realm}
-      />
+      <RealBridge>
+        {children}
+        <ProfileOnboarding
+          baseUrl={config["auth-server-url"].replace(/\/+$/, "")}
+          realm={config.realm}
+        />
+      </RealBridge>
     </TideCloakProvider>
   );
+}
+
+/**
+ * Providers for the simulated identity. Same children, same hook surface, no
+ * TideCloak SDK in the tree — and no ProfileOnboarding, which talks to a Keycloak
+ * account API that does not exist here.
+ */
+export function SimulatedProviders({ children }: { children: React.ReactNode }) {
+  return <DemoBridge>{children}</DemoBridge>;
 }

@@ -37,9 +37,9 @@ export function PreviewMode({
       >
         <strong>Preview mode</strong>
         <span>
-          TideCloak is not configured on this deployment, so sign-in and the approval
-          dashboard are disabled. Layout and copy are real; no account, approval or transfer
-          runs here.
+          TideCloak is not configured and the simulated identity is disabled (DEMO_AUTH=0),
+          so sign-in and the approval dashboard are unavailable. Layout and copy are real; no
+          account, approval or transfer runs here.
         </span>
         <a href="#configuration" style={{ marginLeft: "auto", fontWeight: 800, color: "#5b4518" }}>
           How to enable sign-in →
@@ -58,7 +58,7 @@ export function PreviewMode({
             type="button"
             disabled
             aria-disabled="true"
-            title="TideCloak is not configured on this deployment"
+            title="TideCloak is not configured and the simulator is disabled (DEMO_AUTH=0)"
             style={{ opacity: 0.5, cursor: "not-allowed" }}
           >
             Secure sign in
