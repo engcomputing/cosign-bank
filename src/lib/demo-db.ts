@@ -168,6 +168,24 @@ export async function approveWithdrawalRequest(
       faceSimilarity: faceVerification.similarity,
     });
     const withdrawal: WithdrawalRequest = { ...current, ...policyState };
+
+    // The policy rejects approvals once a request is complete, so this debit runs exactly once per withdrawal.
+    if (withdrawal.status === "application-approved") {
+      if (withdrawal.amountVnd > database.account.availableVnd) {
+        throw new Error("Amount exceeds the available balance");
+      }
+      database.account.balanceVnd -= withdrawal.amountVnd;
+      database.account.availableVnd -= withdrawal.amountVnd;
+      database.recentActivity.unshift({
+        id: `TX-${withdrawal.id}`,
+        label: "Joint withdrawal",
+        counterparty: withdrawal.recipientName,
+        amountVnd: withdrawal.amountVnd,
+        direction: "out",
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     database.withdrawalRequests[index] = withdrawal;
     return { withdrawal, faceMismatch: false as const };
   });

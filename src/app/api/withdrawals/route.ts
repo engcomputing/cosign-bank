@@ -114,7 +114,7 @@ export const PATCH = withRole("account:joint-owner", async (request, jwt) => {
         approvalsRequired: withdrawal.approvalsRequired,
       },
       notice: quorumReached
-        ? "Two independent co-owners approved in the local application. No Tide policy signature or bank transfer was produced."
+        ? "Two independent co-owners approved in the local application. The amount was debited from the demo account balance; no Tide policy signature or real bank transfer was produced."
         : "Approval recorded from the server-verified Tide identity. One more independent co-owner is required.",
     });
   } catch (error) {
