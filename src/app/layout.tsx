@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { Providers } from "./providers";
 import { SetupRequired } from "./setup-required";
 import { ConfigWarnings } from "./config-warnings";
-import { tryLoadTideConfig } from "@/lib/auth/tidecloakConfig";
+import { tryLoadTideConfig, adapterDiagnostics } from "@/lib/auth/tidecloakConfig";
 import "./globals.css";
 
 // The TideCloak adapter JSON is deployment configuration: it is read from an
@@ -39,7 +39,7 @@ export default async function RootLayout({
             {children}
           </Providers>
         ) : (
-          <SetupRequired message={error} />
+          <SetupRequired message={error} diagnostic={adapterDiagnostics()} />
         )}
       </body>
     </html>

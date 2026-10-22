@@ -106,10 +106,22 @@ npm run reset:faces
 
 `data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app resolves the adapter on the server at request time and passes it to the client provider as a prop, so a clean checkout builds and a missing config produces an explanation page rather than a crash.
 
-### The two-step deploy
+### One command (recommended)
+
+On the machine that ran `npm run init`:
 
 ```bash
-npm run init        # once, on the machine that hosts TideCloak → data/tidecloak.json
+npm run deploy            # upload adapter to Production/Preview/Development, then deploy
+npm run deploy -- --dry-run   # show what it will do, change nothing
+```
+
+It validates the adapter, uploads it as `CLIENT_ADAPTER` and `CLIENT_ADAPTER_B64`, and runs
+`vercel --prod`. It uses your own `vercel login` and refuses to deploy an adapter whose
+`auth-server-url` is loopback (see below) unless you pass `--force`.
+
+### Manual / inspect
+
+```bash
 npm run deploy:check
 ```
 
@@ -148,11 +160,17 @@ If TideCloak is not publicly reachable, run the demo locally — that is the int
 
 ### Diagnostics
 
+The setup page and `GET /api/config` both return a **deployment diagnostic**: which adapter
+variables exist in *that* deployment, whether each parses, its length, plus the platform,
+Vercel project ID, branch and commit. That answers "I set it, why is it missing?" without
+guessing. The table below is the short version.
+
 | Symptom | Meaning |
 | :--- | :--- |
-| "No TideCloak adapter config found…" page | No adapter variable is set for this environment, or it was added after the deploy. Add it and redeploy. |
-| "…is set but empty" | The variable exists with no value. |
-| "…is not valid JSON" | Paste mangled the value; use `CLIENT_ADAPTER_B64`. |
+| "No TideCloak adapter config found…" page, all sources `not set` | Nothing reached this deployment. Check the project ID on the page matches the project you edited, the environment scope (Production vs Preview vs Development), and redeploy. Variables are not passed to fork PR builds. |
+| A variable listed `invalid` | The paste was mangled or truncated. Use `CLIENT_ADAPTER_B64`. |
+| A variable listed `empty (0 chars)` | The variable exists with no value. |
+| All sources valid, yet login fails | `auth-server-url` is loopback or `http://` — see the next section. |
 | Yellow banner above the app | Adapter loaded, but `auth-server-url` is loopback or plain `http://` and the app is served from a real host. |
 | `/api/config` | Returns the adapter, or the same error text with HTTP 500, plus `warnings` when sign-in cannot work. |
 
