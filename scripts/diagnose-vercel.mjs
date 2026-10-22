@@ -14,7 +14,7 @@
 // Needs: npx vercel login (run once). Nothing is modified.
 
 import { spawnSync } from "node:child_process";
-import { colors as c } from "./lib/adapter.mjs";
+import { colors as c, vercelCommand } from "./lib/adapter.mjs";
 
 const args = process.argv.slice(2);
 const value = (name) => {
@@ -41,8 +41,9 @@ function sh(command, commandArgs, opts = {}) {
   };
 }
 
+const VC = vercelCommand();
 function vercel(commandArgs, opts) {
-  return sh("npx", ["--yes", "vercel", ...commandArgs], opts);
+  return sh(VC[0], [...VC.slice(1), ...commandArgs], opts);
 }
 
 // --- 1. what does the deployment say about itself? ---------------------------

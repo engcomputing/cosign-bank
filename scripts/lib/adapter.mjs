@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 // Shared adapter resolution/validation for the operator scripts.
 // Mirrors src/lib/auth/tidecloakConfig.ts so the CLIs fail the same way the app
 // does, without importing TypeScript.
@@ -99,3 +100,13 @@ export const colors = {
   dim: (s) => `\x1b[2m${s}\x1b[0m`,
   bold: (s) => `\x1b[1m${s}\x1b[0m`,
 };
+
+/**
+ * Prefer a locally installed Vercel CLI (`npm i -g vercel`); fall back to npx.
+ * Returns [command, ...leadingArgs] so callers can spread it.
+ */
+export function vercelCommand({ execPath = "vercel", which = "vercel" } = {}) {
+  const found = spawnSync(which, ["--version"], { encoding: "utf8" });
+  if (found.status === 0) return [execPath];
+  return ["npx", "--yes", "vercel"];
+}

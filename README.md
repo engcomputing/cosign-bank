@@ -217,12 +217,25 @@ variables to a *project*, not to a repository, so if two projects build this rep
 result of importing it once from the dashboard and once with `vercel`), a variable added to
 one is invisible to the other — and the URL you are looking at may be served by the wrong one.
 
+One command finds the project serving a URL, configures it, deploys, and verifies:
+
+```bash
+npm run fix:vercel -- --url=https://your-app.vercel.app
+```
+
+It reads the deployment's own `/api/config` for its project ID, maps that ID to a project name
+in your account, links it, uploads the adapter to every environment, deploys, then re-reads
+`/api/config` and **fails if the deployed project ID is not the one it configured** — which is
+how a duplicate project gets caught instead of silently ignored.
+
+Read-only inspection instead of acting:
+
 ```bash
 npm run diagnose -- --url=https://your-app.vercel.app   # reads /api/config, then inspects projects
 npm run diagnose -- --url=... --search                 # also finds projects that DO have the variable
 ```
 
-Then deploy to the project that actually serves the URL:
+Or target a project you already know:
 
 ```bash
 npm run deploy -- --project=<project-name> --scope=<team-slug>
