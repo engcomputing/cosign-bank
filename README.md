@@ -106,10 +106,22 @@ npm run reset:faces
 
 `data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app resolves the adapter on the server at request time and passes it to the client provider as a prop, so a clean checkout builds and a missing config produces an explanation page rather than a crash.
 
-### The two-step deploy
+### One command (recommended)
+
+On the machine that ran `npm run init`:
 
 ```bash
-npm run init        # once, on the machine that hosts TideCloak → data/tidecloak.json
+npm run deploy            # upload adapter to Production/Preview/Development, then deploy
+npm run deploy -- --dry-run   # show what it will do, change nothing
+```
+
+It validates the adapter, uploads it as `CLIENT_ADAPTER` and `CLIENT_ADAPTER_B64`, and runs
+`vercel --prod`. It uses your own `vercel login` and refuses to deploy an adapter whose
+`auth-server-url` is loopback (see below) unless you pass `--force`.
+
+### Manual / inspect
+
+```bash
 npm run deploy:check
 ```
 
@@ -138,21 +150,65 @@ A base64 value pasted into `CLIENT_ADAPTER` also works. Never commit `data/tidec
 
 The adapter written by `npm run init` points at `http://localhost:8080`. That URL only resolves on the machine running the container, so a hosted deployment cannot complete sign-in no matter which variable holds the adapter. The app detects this: when served from a real hostname it shows a banner explaining the problem instead of hanging on login, and `npm run deploy:check` exits non-zero for the same reason.
 
-To host it properly, expose TideCloak on a public HTTPS URL and re-export the adapter:
-
-```bash
-TIDECLOAK_URL=https://tidecloak.example.com CLIENT_APP_URL=https://your-app.vercel.app ./scripts/init-tidecloak.sh
-```
-
 If TideCloak is not publicly reachable, run the demo locally — that is the intended deployment mode for this prototype.
+
+### Hosting TideCloak publicly (needed for sign-in on the public URL)
+
+TideCloak is a Keycloak-based server, so it needs a DNS name, TLS and a reachable port — the
+same as any auth server. One path:
+
+1. **Run the container on a host with a public name.** On a VPS (or Fly/Render/Railway),
+   put TLS in front with Caddy:
+   ```
+   tidecloak.example.com {
+       reverse_proxy 127.0.0.1:8080
+   }
+   ```
+2. **Bootstrap with the public URL so the realm's issuer matches it.** This is the step that
+   makes the adapter usable; without it the exported `auth-server-url` stays `localhost`:
+   ```bash
+   TIDECLOAK_HOSTNAME=https://tidecloak.example.com \
+   CLIENT_APP_URL=https://your-app.vercel.app \
+   ./scripts/init-tidecloak.sh
+   ```
+   `KC_HOSTNAME` and `KC_PROXY_HEADERS=xforwarded` are passed to the container automatically
+   when `TIDECLOAK_HOSTNAME` uses `https://`.
+3. **Verify before deploying** — this talks to the live realm:
+   ```bash
+   npm run verify:auth
+   ```
+   It checks HTTPS, discovery, that `discovery.issuer` equals the adapter's
+   `<auth-server-url>/realms/<realm>`, and that the adapter's `jwk` kids are among the keys
+   the realm currently publishes. Exit code 1 means a browser would fail; the message names
+   the fix (usually `KC_HOSTNAME`, DNS, or a stale export).
+4. **Upload the adapter and deploy:**
+   ```bash
+   npm run deploy
+   ```
+
+Notes:
+
+- **Preview deployments:** the realm's redirect URIs come from `CLIENT_APP_URL`, so preview
+  URLs (`https://cosign-bank-git-<branch>-<team>.vercel.app`) are not covered. Test sign-in
+  on the production URL, or add the preview origins in the Tide console / realm client.
+- **`npm run verify:auth -- --allow-local`** is the escape hatch for a self-hosted LAN
+  setup; it downgrades the loopback/`http://` checks to warnings.
+- Keep the adapter out of Git in every case; `npm run verify:auth` and `npm run deploy` both
+  read it from `data/tidecloak.json` or the environment.
 
 ### Diagnostics
 
+The setup page and `GET /api/config` both return a **deployment diagnostic**: which adapter
+variables exist in *that* deployment, whether each parses, its length, plus the platform,
+Vercel project ID, branch and commit. That answers "I set it, why is it missing?" without
+guessing. The table below is the short version.
+
 | Symptom | Meaning |
 | :--- | :--- |
-| "No TideCloak adapter config found…" page | No adapter variable is set for this environment, or it was added after the deploy. Add it and redeploy. |
-| "…is set but empty" | The variable exists with no value. |
-| "…is not valid JSON" | Paste mangled the value; use `CLIENT_ADAPTER_B64`. |
+| "No TideCloak adapter config found…" page, all sources `not set` | Nothing reached this deployment. Check the project ID on the page matches the project you edited, the environment scope (Production vs Preview vs Development), and redeploy. Variables are not passed to fork PR builds. |
+| A variable listed `invalid` | The paste was mangled or truncated. Use `CLIENT_ADAPTER_B64`. |
+| A variable listed `empty (0 chars)` | The variable exists with no value. |
+| All sources valid, yet login fails | `auth-server-url` is loopback or `http://` — see the next section. |
 | Yellow banner above the app | Adapter loaded, but `auth-server-url` is loopback or plain `http://` and the app is served from a real host. |
 | `/api/config` | Returns the adapter, or the same error text with HTTP 500, plus `warnings` when sign-in cannot work. |
 

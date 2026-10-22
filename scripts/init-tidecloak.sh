@@ -33,6 +33,10 @@ TIDECLOAK_URL="${TIDECLOAK_URL:-http://localhost:8080}"
 REALM_NAME="${REALM_NAME:-$_APP_NAME}"
 CLIENT_NAME="${CLIENT_NAME:-${_APP_NAME}-client}"
 CLIENT_APP_URL="${CLIENT_APP_URL:-http://localhost:3000}"
+# Public base URL of TideCloak, for deployments where browsers must reach it
+# (KC_HOSTNAME). Leave unset for local Docker, where it is http://localhost:8080.
+# Example: TIDECLOAK_HOSTNAME=https://tidecloak.example.com
+TIDECLOAK_HOSTNAME="${TIDECLOAK_HOSTNAME:-}"
 # No default email: the licence email is asked for below (TIDE_LICENSE_EMAIL).
 ADAPTER_OUTPUT="${ADAPTER_OUTPUT:-./data/tidecloak.json}"
 TIDECLOAK_IMAGE="${TIDECLOAK_IMAGE:-tideorg/tidecloak-dev:latest}"
@@ -217,9 +221,21 @@ case "$TIDECLOAK_IMAGE" in
          exit 1 ;;
 esac
 
+# Advertised hostname: without this the realm's issuer is whatever host the
+# browser used to reach the admin API (usually localhost), which makes every
+# hosted login fail with an issuer mismatch.
+EXTRA_ENV=()
+if [ -n "$TIDECLOAK_HOSTNAME" ]; then
+  EXTRA_ENV+=(-e KC_HOSTNAME="$TIDECLOAK_HOSTNAME")
+  case "$TIDECLOAK_HOSTNAME" in
+    https://*) EXTRA_ENV+=(-e KC_PROXY_HEADERS=xforwarded) ;;
+  esac
+fi
+
 docker run -d --name tidecloak \
   -v "$PROJECT_DIR/data:/opt/keycloak/data/h2" \
   -p 8080:8080 \
+  "${EXTRA_ENV[@]}" \
   -e KC_BOOTSTRAP_ADMIN_USERNAME="$KC_BOOTSTRAP_ADMIN_USERNAME" \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD="$KC_BOOTSTRAP_ADMIN_PASSWORD" \
   "$TIDECLOAK_IMAGE"
@@ -559,7 +575,15 @@ if jq -e 'has("jwk") and has("vendorId") and has("homeOrkUrl")' "$ADAPTER_OUTPUT
   echo "  Realm:          $REALM_NAME"
   echo "  Client:         $CLIENT_NAME"
   echo ""
-  echo "  Next: npm run dev"
+  if [ -n "$TIDECLOAK_HOSTNAME" ]; then
+    echo "  Public URL:     $TIDECLOAK_HOSTNAME"
+    echo "  App URL:        $CLIENT_APP_URL"
+    echo ""
+    echo "  Next: npm run verify:auth   # confirms a browser can reach this realm"
+    echo "        npm run deploy        # uploads the adapter and deploys"
+  else
+    echo "  Next: npm run dev"
+  fi
   echo "============================================"
 else
   echo ""

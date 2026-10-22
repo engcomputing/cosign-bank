@@ -231,3 +231,91 @@ function validateTideConfig(value: unknown, source: string): TidecloakConfig {
 
   return config;
 }
+
+/**
+ * Deployment self-diagnostic.
+ *
+ * Answers the question the setup page cannot otherwise answer: "I set the
+ * variable — why does this deployment still say it is missing?" It reports
+ * only *which* sources exist and whether they parse, plus the platform
+ * identity of the running deployment. It never returns adapter values, so it
+ * is safe to render in a browser and to return from /api/config.
+ */
+export type AdapterSourceDiagnostic = {
+  key: string;
+  present: boolean;
+  status: "absent" | "empty" | "invalid" | "valid";
+  /** Length of the raw value; useful for spotting a truncated paste. */
+  length?: number;
+  detail?: string;
+};
+
+export type DeploymentDiagnostic = {
+  platform: {
+    /** e.g. "vercel", "local" */
+    name: string;
+    /** production | preview | development, when the host reports it */
+    environment: string | null;
+    /** Deployment URL as seen by the platform, not the request */
+    url: string | null;
+    /** Project ID — compare with the project you edited in the dashboard */
+    projectId: string | null;
+    commitSha: string | null;
+    branch: string | null;
+  };
+  sources: AdapterSourceDiagnostic[];
+  file: { path: string; present: boolean; status: "absent" | "invalid" | "valid" };
+  /** True when no source produced a usable adapter. */
+  missing: boolean;
+};
+
+export function adapterDiagnostics(): DeploymentDiagnostic {
+  const sources = ADAPTER_ENV_KEYS.map((key): AdapterSourceDiagnostic => {
+    const raw = process.env[key];
+    if (raw === undefined) return { key, present: false, status: "absent" };
+    const value = raw.trim();
+    if (!value) return { key, present: true, status: "empty", length: 0 };
+
+    try {
+      const parsed = parseAdapterValue(value, key);
+      validateTideConfig(parsed, key);
+      return { key, present: true, status: "valid", length: value.length };
+    } catch (error) {
+      return {
+        key,
+        present: true,
+        status: "invalid",
+        length: value.length,
+        detail: error instanceof Error ? error.message : "Invalid adapter value",
+      };
+    }
+  });
+
+  const configPath = join(process.cwd(), "data", "tidecloak.json");
+  let fileStatus: "absent" | "invalid" | "valid" = "absent";
+  try {
+    validateTideConfig(JSON.parse(readFileSync(configPath, "utf-8")), "data/tidecloak.json");
+    fileStatus = "valid";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") fileStatus = "invalid";
+  }
+
+  return {
+    platform: {
+      name: isHostedDeployment()
+        ? process.env.VERCEL
+          ? "vercel"
+          : "hosted"
+        : "local",
+      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
+      url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+      projectId: process.env.VERCEL_PROJECT_ID ?? null,
+      commitSha:
+        process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null,
+      branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+    },
+    sources,
+    file: { path: "data/tidecloak.json", present: fileStatus !== "absent", status: fileStatus },
+    missing: !sources.some((source) => source.status === "valid") && fileStatus !== "valid",
+  };
+}
