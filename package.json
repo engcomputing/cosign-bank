@@ -10,6 +10,7 @@
     "seed": "node scripts/reset-demo-data.mjs",
     "deploy": "node scripts/deploy-vercel.mjs",
     "deploy:check": "node scripts/check-deploy-config.mjs",
+    "verify:auth": "node scripts/verify-public-auth.mjs",
     "reset": "node scripts/reset-demo-data.mjs",
     "reset:faces": "node scripts/reset-face-profiles.mjs",
     "test:unauth": "node scripts/check-unauthenticated.mjs",

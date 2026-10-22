@@ -150,13 +150,51 @@ A base64 value pasted into `CLIENT_ADAPTER` also works. Never commit `data/tidec
 
 The adapter written by `npm run init` points at `http://localhost:8080`. That URL only resolves on the machine running the container, so a hosted deployment cannot complete sign-in no matter which variable holds the adapter. The app detects this: when served from a real hostname it shows a banner explaining the problem instead of hanging on login, and `npm run deploy:check` exits non-zero for the same reason.
 
-To host it properly, expose TideCloak on a public HTTPS URL and re-export the adapter:
-
-```bash
-TIDECLOAK_URL=https://tidecloak.example.com CLIENT_APP_URL=https://your-app.vercel.app ./scripts/init-tidecloak.sh
-```
-
 If TideCloak is not publicly reachable, run the demo locally — that is the intended deployment mode for this prototype.
+
+### Hosting TideCloak publicly (needed for sign-in on the public URL)
+
+TideCloak is a Keycloak-based server, so it needs a DNS name, TLS and a reachable port — the
+same as any auth server. One path:
+
+1. **Run the container on a host with a public name.** On a VPS (or Fly/Render/Railway),
+   put TLS in front with Caddy:
+   ```
+   tidecloak.example.com {
+       reverse_proxy 127.0.0.1:8080
+   }
+   ```
+2. **Bootstrap with the public URL so the realm's issuer matches it.** This is the step that
+   makes the adapter usable; without it the exported `auth-server-url` stays `localhost`:
+   ```bash
+   TIDECLOAK_HOSTNAME=https://tidecloak.example.com \
+   CLIENT_APP_URL=https://your-app.vercel.app \
+   ./scripts/init-tidecloak.sh
+   ```
+   `KC_HOSTNAME` and `KC_PROXY_HEADERS=xforwarded` are passed to the container automatically
+   when `TIDECLOAK_HOSTNAME` uses `https://`.
+3. **Verify before deploying** — this talks to the live realm:
+   ```bash
+   npm run verify:auth
+   ```
+   It checks HTTPS, discovery, that `discovery.issuer` equals the adapter's
+   `<auth-server-url>/realms/<realm>`, and that the adapter's `jwk` kids are among the keys
+   the realm currently publishes. Exit code 1 means a browser would fail; the message names
+   the fix (usually `KC_HOSTNAME`, DNS, or a stale export).
+4. **Upload the adapter and deploy:**
+   ```bash
+   npm run deploy
+   ```
+
+Notes:
+
+- **Preview deployments:** the realm's redirect URIs come from `CLIENT_APP_URL`, so preview
+  URLs (`https://cosign-bank-git-<branch>-<team>.vercel.app`) are not covered. Test sign-in
+  on the production URL, or add the preview origins in the Tide console / realm client.
+- **`npm run verify:auth -- --allow-local`** is the escape hatch for a self-hosted LAN
+  setup; it downgrades the loopback/`http://` checks to warnings.
+- Keep the adapter out of Git in every case; `npm run verify:auth` and `npm run deploy` both
+  read it from `data/tidecloak.json` or the environment.
 
 ### Diagnostics
 

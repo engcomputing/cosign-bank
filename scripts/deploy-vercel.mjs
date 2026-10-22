@@ -10,9 +10,16 @@
 // The adapter is public configuration (public client settings + the realm's
 // public signing keys), so uploading it as an environment variable is safe.
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import {
+  colors as c,
+  readAdapter,
+  validateAdapter,
+  isLoopbackUrl,
+  adapterBase64,
+} from "./lib/adapter.mjs";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -25,14 +32,6 @@ const environments = (envArg ? envArg.slice(6) : "production,preview,development
   .filter((s) => ["production", "preview", "development"].includes(s));
 const target = targetArg ? targetArg.slice(9) : "production";
 
-const c = {
-  red: (s) => `\x1b[31m${s}\x1b[0m`,
-  green: (s) => `\x1b[32m${s}\x1b[0m`,
-  yellow: (s) => `\x1b[33m${s}\x1b[0m`,
-  dim: (s) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s) => `\x1b[1m${s}\x1b[0m`,
-};
-
 function die(message) {
   console.error(`${c.red("✗")} ${message}`);
   process.exit(1);
@@ -41,58 +40,34 @@ function die(message) {
 if (environments.length === 0) die("--env must list production, preview or development.");
 
 // --- 1. resolve the adapter locally -----------------------------------------
-const ADAPTER_ENV_KEYS = ["CLIENT_ADAPTER", "TIDECLOAK_ADAPTER", "CLIENT_ADAPTER_B64"];
-let source = null;
-let adapter = null;
-
-for (const key of ADAPTER_ENV_KEYS) {
-  const raw = process.env[key];
-  if (!raw || !raw.trim()) continue;
-  const value = raw.trim();
-  try {
-    adapter = JSON.parse(key.endsWith("_B64") ? Buffer.from(value, "base64").toString("utf8") : value);
-    source = key;
-    break;
-  } catch {
-    die(`${key} is set but is not valid adapter JSON.`);
-  }
+let resolved;
+try {
+  resolved = readAdapter({ fs: { readFileSync }, cwd: process.cwd(), path });
+} catch (error) {
+  die(error.message);
 }
 
-if (!adapter) {
-  try {
-    adapter = JSON.parse(readFileSync(path.join(process.cwd(), "data", "tidecloak.json"), "utf8"));
-    source = "data/tidecloak.json";
-  } catch {
-    die(
-      "No adapter found. Run `npm run init` (or set CLIENT_ADAPTER) first.\n" +
-        "  Diagnose with: npm run deploy:check",
-    );
-  }
+if (!resolved) {
+  die(
+    "No adapter found. Run `npm run init` (or set CLIENT_ADAPTER) first.\n" +
+      "  Diagnose with: npm run deploy:check",
+  );
 }
 
-for (const field of ["realm", "auth-server-url", "resource"]) {
-  if (typeof adapter[field] !== "string" || !adapter[field]) {
-    die(`Adapter from ${source} is missing "${field}".`);
-  }
+const { adapter, source } = resolved;
+try {
+  validateAdapter(adapter, source);
+} catch (error) {
+  die(error.message);
 }
-if (!adapter.jwk) die(`Adapter from ${source} is missing jwk — re-export with IGA enabled.`);
 
 console.log(`${c.green("✓")} Adapter loaded from ${c.bold(source)}`);
 console.log(`${c.dim("  realm:")} ${adapter.realm}`);
 console.log(`${c.dim("  auth-server-url:")} ${adapter["auth-server-url"]}`);
 
 // --- 2. warn about a config that cannot work hosted --------------------------
-function isLoopback(value) {
-  try {
-    const host = new URL(value).hostname;
-    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(host) || host.endsWith(".localhost");
-  } catch {
-    return false;
-  }
-}
-
 let blocking = false;
-if (isLoopback(adapter["auth-server-url"])) {
+if (isLoopbackUrl(adapter["auth-server-url"])) {
   blocking = true;
   console.error("");
   console.error(`${c.yellow("!")} ${c.bold("auth-server-url is loopback — sign-in cannot work on Vercel.")}`);
@@ -100,7 +75,8 @@ if (isLoopback(adapter["auth-server-url"])) {
   console.error("  Deploying anyway only moves the failure from this page to the login button.");
   console.error("");
   console.error("  To host it: put TideCloak on a public HTTPS URL and re-export:");
-  console.error("    TIDECLOAK_URL=https://your-tidecloak-host CLIENT_APP_URL=https://your-app.vercel.app ./scripts/init-tidecloak.sh");
+  console.error("    TIDECLOAK_HOSTNAME=https://your-tidecloak-host CLIENT_APP_URL=https://your-app.vercel.app ./scripts/init-tidecloak.sh");
+  console.error("    npm run verify:auth        # proves it is reachable and the issuer matches");
   console.error("");
   console.error("  For a local-only demo, skip this and run `npm run dev`.");
   if (!args.includes("--force")) {
@@ -112,7 +88,7 @@ if (isLoopback(adapter["auth-server-url"])) {
 }
 
 const compact = JSON.stringify(adapter);
-const base64 = Buffer.from(compact, "utf8").toString("base64");
+const base64 = adapterBase64(adapter);
 
 // --- 3. upload ---------------------------------------------------------------
 function run(command, commandArgs, input, label) {
