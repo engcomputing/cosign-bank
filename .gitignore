@@ -5,6 +5,7 @@ out/
 build/
 .DS_Store
 .tide-pack/
+.vercel/
 work/
 
 # Secrets — operator credentials NEVER belong in the repo (AP-41).

@@ -102,6 +102,26 @@ Before recording, each founder opens **Co-owners → Enroll my face**, completes
 npm run reset:faces
 ```
 
+## Deploying to Vercel (or any hosted Node host)
+
+`data/tidecloak.json` is gitignored: it is environment-specific and is written by `npm run init`, so a hosted build checkout never contains it. The app therefore resolves the adapter on the server from the `CLIENT_ADAPTER` environment variable and passes it to the client provider as a prop. The build no longer imports the JSON file, so a clean checkout compiles.
+
+1. Locally run `npm run init` and copy the generated `data/tidecloak.json`.
+2. Collapse it to one line:
+   ```bash
+   jq -c . data/tidecloak.json
+   ```
+3. In Vercel, open **Project → Settings → Environment Variables** and add `CLIENT_ADAPTER` with that single-line JSON for Production, Preview and Development, then redeploy.
+4. Never commit `data/tidecloak.json`.
+
+If `CLIENT_ADAPTER` is missing or malformed the build still succeeds; the app renders a setup page explaining what to set, and `/api/config` returns the same message with HTTP 500. Local development is unchanged: with no `CLIENT_ADAPTER`, the adapter is read from `data/tidecloak.json`.
+
+The adapter is public configuration (public client settings plus the realm's public signing keys), not a credential. `KC_BOOTSTRAP_ADMIN_*`, `TIDE_LICENSE_EMAIL` and `TIDE_TERMS_ACCEPTED` are only used by `npm run init` on your own machine and do not belong in a hosted environment.
+
+### Hosted deployments: serverless storage caveat
+
+The synthetic store is three plain JSON files under `data/`: `bank-demo-db.json`, `face-profiles.json` and the ignored `tidecloak.json`. All three are gitignored, and Vercel's filesystem is read-only and per-instance, so a deployed instance starts with no bank database and cannot persist approvals across requests or instances. Sign-in and the landing page work when `CLIENT_ADAPTER` is set; the joint-approval flow needs a writable shared store (Postgres, KV, a mounted volume) before it can be hosted. Run the full demo locally, or wire the store before pointing a reviewer at a hosted URL.
+
 ## Verification
 
 With the app running:
