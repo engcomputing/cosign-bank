@@ -210,6 +210,14 @@ guessing. The table below is the short version.
 | A variable listed `empty (0 chars)` | The variable exists with no value. |
 | All sources valid, yet login fails | `auth-server-url` is loopback or `http://` — see the next section. |
 
+### Preview mode (no adapter configured)
+
+When no adapter resolves, the app renders the real landing page with a **Preview mode** banner
+instead of an error: sign-in and the approval dashboard are visibly disabled, and the
+configuration panel below the fold shows the deployment diagnostic. Nothing is simulated —
+there is no fake session, no seeded login state, and the disabled controls have no handler.
+Configure an adapter and the same URL serves the normal, fully interactive app.
+
 ### Two Vercel projects, one repo
 
 The diagnosing field is **Vercel project ID** in the table above. Vercel keys environment

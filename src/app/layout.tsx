@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Providers } from "./providers";
-import { SetupRequired } from "./setup-required";
+import { PreviewMode } from "./preview-mode";
 import { ConfigWarnings } from "./config-warnings";
 import { tryLoadTideConfig, adapterDiagnostics } from "@/lib/auth/tidecloakConfig";
 import "./globals.css";
@@ -39,7 +39,7 @@ export default async function RootLayout({
             {children}
           </Providers>
         ) : (
-          <SetupRequired message={error} diagnostic={adapterDiagnostics()} />
+          <PreviewMode message={error} diagnostic={adapterDiagnostics()} />
         )}
       </body>
     </html>
