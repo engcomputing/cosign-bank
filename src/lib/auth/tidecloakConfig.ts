@@ -260,6 +260,8 @@ export type DeploymentDiagnostic = {
     url: string | null;
     /** Project ID — compare with the project you edited in the dashboard */
     projectId: string | null;
+    /** Team/account ID that owns the project */
+    orgId: string | null;
     commitSha: string | null;
     branch: string | null;
   };
@@ -268,6 +270,24 @@ export type DeploymentDiagnostic = {
   /** True when no source produced a usable adapter. */
   missing: boolean;
 };
+
+/**
+ * Identity of the running deployment, as the hosting platform reports it.
+ * Non-secret; used to tell "I set the variable" apart from "I set it on a
+ * different Vercel project / environment / commit".
+ */
+export function deploymentInfo() {
+  const onVercel = Boolean(process.env.VERCEL);
+  return {
+    name: onVercel ? "vercel" : isHostedDeployment() ? "hosted" : "local",
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
+    url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    projectId: process.env.VERCEL_PROJECT_ID ?? null,
+    orgId: process.env.VERCEL_ORG_ID ?? null,
+    branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null,
+  };
+}
 
 export function adapterDiagnostics(): DeploymentDiagnostic {
   const sources = ADAPTER_ENV_KEYS.map((key): AdapterSourceDiagnostic => {
@@ -300,19 +320,16 @@ export function adapterDiagnostics(): DeploymentDiagnostic {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") fileStatus = "invalid";
   }
 
+  const deployment = deploymentInfo();
   return {
     platform: {
-      name: isHostedDeployment()
-        ? process.env.VERCEL
-          ? "vercel"
-          : "hosted"
-        : "local",
-      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? null,
-      url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
-      projectId: process.env.VERCEL_PROJECT_ID ?? null,
-      commitSha:
-        process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? null,
-      branch: process.env.VERCEL_GIT_COMMIT_REF ?? null,
+      name: deployment.name,
+      environment: deployment.environment,
+      url: deployment.url,
+      projectId: deployment.projectId,
+      orgId: deployment.orgId,
+      commitSha: deployment.commitSha,
+      branch: deployment.branch,
     },
     sources,
     file: { path: "data/tidecloak.json", present: fileStatus !== "absent", status: fileStatus },

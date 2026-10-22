@@ -209,6 +209,29 @@ guessing. The table below is the short version.
 | A variable listed `invalid` | The paste was mangled or truncated. Use `CLIENT_ADAPTER_B64`. |
 | A variable listed `empty (0 chars)` | The variable exists with no value. |
 | All sources valid, yet login fails | `auth-server-url` is loopback or `http://` — see the next section. |
+
+### Two Vercel projects, one repo
+
+The diagnosing field is **Vercel project ID** in the table above. Vercel keys environment
+variables to a *project*, not to a repository, so if two projects build this repo (a common
+result of importing it once from the dashboard and once with `vercel`), a variable added to
+one is invisible to the other — and the URL you are looking at may be served by the wrong one.
+
+```bash
+npm run diagnose -- --url=https://your-app.vercel.app   # reads /api/config, then inspects projects
+npm run diagnose -- --url=... --search                 # also finds projects that DO have the variable
+```
+
+Then deploy to the project that actually serves the URL:
+
+```bash
+npm run deploy -- --project=<project-name> --scope=<team-slug>
+```
+
+`deploy` links that project explicitly, uploads the adapter, deploys, and finally fetches
+`/api/config` to confirm the deployment's project ID matches the project it configured — so a
+mismatch fails loudly instead of silently. Delete the unused duplicate project to stop the
+ambiguity.
 | Yellow banner above the app | Adapter loaded, but `auth-server-url` is loopback or plain `http://` and the app is served from a real host. |
 | `/api/config` | Returns the adapter, or the same error text with HTTP 500, plus `warnings` when sign-in cannot work. |
 

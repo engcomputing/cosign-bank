@@ -92,12 +92,20 @@ export function SetupRequired({
                 </>
               ) : (
                 <>
-                  No adapter variable reached this deployment. If you added one in the
-                  dashboard, confirm it is on <strong>the same Vercel project as this URL</strong>{" "}
-                  (compare the project ID above), scoped to the{" "}
-                  <strong>{diagnostic.platform.environment ?? "matching"}</strong> environment,
-                  and that you redeployed afterwards. Note that Vercel does not pass project
-                  environment variables to deployments built from forks.
+                  No adapter variable reached this deployment. The most common cause is a{" "}
+                  <strong>second Vercel project serving this URL</strong> — variables added to a
+                  project with the same name do not appear here. Compare the project ID above
+                  with the project you edited, then run:
+                  <pre style={{ margin: "10px 0 0", padding: 12, borderRadius: 10, background: "#f3f5f1", overflowX: "auto", fontSize: 12 }}>
+                    npm run diagnose -- --url={diagnostic.platform.url ?? "https://<this-deployment>"}
+                  </pre>
+                  <span style={{ display: "block", marginTop: 8 }}>
+                    It reports which project holds the adapter and which one serves this
+                    deployment. Also confirm the environment scope (
+                    <strong>{diagnostic.platform.environment ?? "matching"}</strong>) and that
+                    you redeployed afterwards: Vercel never applies new variables to an
+                    existing deployment, and does not pass project variables to fork builds.
+                  </span>
                 </>
               )}
             </p>
