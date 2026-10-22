@@ -1,8 +1,9 @@
 import { loadTideConfig } from "@/lib/auth/tidecloakConfig";
 
 // Serve adapter JSON for server-side use (e.g. JWT verification).
-// The client-side SDK now imports the adapter JSON directly via TideCloakProvider's config prop.
-// This route remains available for any server-side consumers that need the config.
+// The client gets the same config through TideCloakProvider's config prop, which
+// the root layout fills from the server-resolved adapter (CLIENT_ADAPTER or
+// data/tidecloak.json). This route serves any other server-side consumer.
 export async function GET() {
   try {
     const config = loadTideConfig();
